@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Chat Bot Local</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #f4f7fb;
+      margin: 0;
+      padding: 0;
+      color: #1f2937;
+    }
+
+    .page {
+      max-width: 760px;
+      margin: 0 auto;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      padding: 24px;
+    }
+
+    header {
+      margin-bottom: 18px;
+    }
+
+    h1 {
+      margin: 0 0 8px;
+      font-size: 2rem;
+    }
+
+    .description {
+      color: #4b5563;
+      margin-bottom: 20px;
+    }
+
+    .chat-window {
+      background: #ffffff;
+      border-radius: 16px;
+      box-shadow: 0 20px 50px rgba(15, 23, 42, 0.08);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      min-height: 540px;
+    }
+
+    .messages {
+      padding: 20px;
+      flex: 1;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .message {
+      max-width: 84%;
+      line-height: 1.6;
+      padding: 14px 18px;
+      border-radius: 16px;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+
+    .message.user {
+      align-self: flex-end;
+      background: #2563eb;
+      color: #fff;
+    }
+
+    .message.bot {
+      align-self: flex-start;
+      background: #f3f4f6;
+      color: #111827;
+    }
+
+    .composer {
+      display: flex;
+      gap: 10px;
+      padding: 18px;
+      border-top: 1px solid #e5e7eb;
+      background: #fafbff;
+    }
+
+    .composer textarea {
+      flex: 1;
+      min-height: 56px;
+      resize: vertical;
+      border: 1px solid #d1d5db;
+      border-radius: 12px;
+      padding: 12px;
+      font-size: 1rem;
+      line-height: 1.5;
+    }
+
+    .composer button {
+      background: #2563eb;
+      color: white;
+      border: none;
+      border-radius: 12px;
+      padding: 0 20px;
+      font-size: 1rem;
+      cursor: pointer;
+      transition: background 0.2s ease;
+    }
+
+    .composer button:hover {
+      background: #1d4ed8;
+    }
+
+    .status {
+      margin-bottom: 14px;
+      color: #6b7280;
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <header>
+      <h1>Chat Bot Local</h1>
+      <p class="description">Escribe un mensaje y presiona Enviar. El chat usa el servidor local para generar la respuesta.</p>
+      <div class="status" id="status">Listo para chatear.</div>
+    </header>
+
+    <div class="chat-window">
+      <div class="messages" id="messages"></div>
+      <div class="composer">
+        <textarea id="inputMessage" placeholder="Escribe tu mensaje aquí..." rows="2"></textarea>
+        <button id="sendButton">Enviar</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const messagesEl = document.getElementById('messages');
+    const inputEl = document.getElementById('inputMessage');
+    const sendButton = document.getElementById('sendButton');
+    const statusEl = document.getElementById('status');
+
+    const chatMessages = [
+      { role: 'system', content: 'Eres un asistente útil y amable.' }
+    ];
+
+    function addMessage(role, text) {
+      const messageEl = document.createElement('div');
+      messageEl.className = `message ${role}`;
+      messageEl.textContent = text;
+      messagesEl.appendChild(messageEl);
+      messagesEl.scrollTop = messagesEl.scrollHeight;
+    }
+
+    async function sendMessage() {
+      const text = inputEl.value.trim();
+      if (!text) return;
+
+      addMessage('user', text);
+      chatMessages.push({ role: 'user', content: text });
+      inputEl.value = '';
+      inputEl.focus();
+      statusEl.textContent = 'Generando respuesta...';
+      sendButton.disabled = true;
+
+      try {
+        const response = await fetch('/api/chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ model: 'qwen3.5:397b-cloud', messages: chatMessages })
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}));
+          throw new Error(errorData.error || 'Error en la petición');
+        }
+
+        const data = await response.json();
+        const reply = data.reply || 'No se recibió respuesta del servidor.';
+        addMessage('bot', reply);
+        chatMessages.push({ role: 'assistant', content: reply });
+        statusEl.textContent = 'Respuesta recibida.';
+      } catch (error) {
+        addMessage('bot', `Error: ${error.message}`);
+        statusEl.textContent = 'Error al comunicarse con el servidor.';
+      } finally {
+        sendButton.disabled = false;
+      }
+    }
+
+    sendButton.addEventListener('click', sendMessage);
+    inputEl.addEventListener('keydown', event => {
+      if (event.key === 'Enter' && !event.shiftKey) {
+        event.preventDefault();
+        sendMessage();
+      }
+    });
+  </script>
+</body>
+</html>
